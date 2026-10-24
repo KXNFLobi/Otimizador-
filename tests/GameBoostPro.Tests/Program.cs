@@ -14,7 +14,7 @@ try
     Check(!GameBoostPro.Program.Eligible(old, root + "-other", cutoff), "arquivo fora da raiz preservado");
     var link = Path.Combine(root, "link.tmp"); File.CreateSymbolicLink(link, old);
     Check(!GameBoostPro.Program.Eligible(link, root, cutoff), "link simbólico preservado");
-    Check(GameBoostPro.Program.Options.Length == 18, "18 opções disponíveis");
+    Check(GameBoostPro.Program.Options.Length == 20, "20 opções disponíveis");
     if (!OperatingSystem.IsWindows()) Check(GameBoostPro.Program.Main([]) == 1, "operações bloqueadas fora do Windows");
     Check(!GameMode.Confirmed(null) && !GameMode.Confirmed("SIM") && !GameMode.Confirmed(""), "cancelamento e EOF não autorizam alterações");
     Check(GameMode.Confirmed("APLICAR"), "confirmação explícita reconhecida");
@@ -58,6 +58,7 @@ try
     File.WriteAllText(stateFile, "inválido");
     failed = false; try { recovered.Restore(); } catch (System.Text.Json.JsonException) { failed = true; }
     Check(failed && recovered.Pending && active == original, "registro inválido não aplica plano e é preservado");
+    StorageTests.Run(root, Check);
     Console.WriteLine($"{passed} testes aprovados.");
 }
 finally { Directory.Delete(root, true); }

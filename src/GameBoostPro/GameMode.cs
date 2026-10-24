@@ -209,7 +209,7 @@ public static class GameMode
         try { var d = new DriveInfo(Path.GetPathRoot(game)!); Report($"Disco do jogo: {d.AvailableFreeSpace / 1073741824.0:F2} GiB livres de {d.TotalSize / 1073741824.0:F2} GiB."); if (d.AvailableFreeSpace < 5L * 1073741824) Console.WriteLine("Pouco espaço livre; verifique os requisitos do jogo. Isso não confirma a causa de um crash."); }
         catch (Exception ex) { Report("Espaço indisponível: " + ex.Message); }
     }
-    static string Shell(string script, string? selected = null)
+    internal static string Shell(string script, string? selected = null)
     {
         var info = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe")) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new();" + script)) }) info.ArgumentList.Add(arg);

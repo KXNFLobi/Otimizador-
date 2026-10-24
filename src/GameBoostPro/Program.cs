@@ -6,7 +6,7 @@ namespace GameBoostPro;
 
 public static class Program
 {
-    public static readonly string[] Options = ["Desativar recursos", "Desinstalar apps", "Atualizar drivers", "Limpar temporários", "Recursos de energia", "Configurações visuais", "Limpar Prefetch", "Apps de inicialização", "Monitorar hardware e temperatura", "Apps de segundo plano", "Configurar Game Bar", "Relatórios de erro", "Configurar Cortana", "Prioridade da CPU / GPU", "Configurar telemetria", "Prioridade foreground", "Diagnosticar conexão e ping", "MODO JOGO — FPS E ESTABILIDADE"];
+    public static readonly string[] Options = ["Desativar recursos", "Desinstalar apps", "Atualizar drivers", "Limpar temporários", "Recursos de energia", "Configurações visuais", "Limpar Prefetch", "Apps de inicialização", "Monitorar hardware e temperatura", "Apps de segundo plano", "Configurar Game Bar", "Relatórios de erro", "Configurar Cortana", "Prioridade da CPU / GPU", "Configurar telemetria", "Prioridade foreground", "Diagnosticar conexão e ping", "MODO JOGO — FPS E ESTABILIDADE", "ANALISAR E LIMPAR SSD", "ANALISAR E LIMPAR HD"];
     public static int Main(string[] args)
     {
         if (args.Contains("--help")) { Console.WriteLine("GAME BOOST PRO — menu Windows 10/11. Execute sem argumentos no Windows."); return 0; }
@@ -48,6 +48,8 @@ public static class Program
             case 16: Console.WriteLine("Em Avançado > Agendamento do processador, revise a preferência por Programas. Sem ajustes automáticos no registro."); Open("SystemPropertiesPerformance.exe"); break;
             case 17: PingHost(); break;
             case 18: GameMode.Run(); break;
+            case 19: StorageMenu.Run("SSD"); break;
+            case 20: StorageMenu.Run("HD"); break;
         }
     }
     public static bool Eligible(string path, string root, DateTime cutoff)

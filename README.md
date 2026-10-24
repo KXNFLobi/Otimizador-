@@ -1,6 +1,6 @@
 # GAME BOOST PRO
 
-Primeira etapa: aplicativo de **terminal**, inspirado na imagem de referência, com 18 opções em português. Requer Windows 10/11 para executar operações e SDK .NET 8 para desenvolver. Não requer execução permanente como administrador.
+Primeira etapa: aplicativo de **terminal**, inspirado na imagem de referência, com 20 opções em português. Requer Windows 10/11 para executar operações e SDK .NET 8 para desenvolver. Não requer execução permanente como administrador.
 
 ## Executar e testar
 
@@ -14,7 +14,7 @@ Abra `artifacts/win-x64/GameBoostPro.exe` no Windows. Não é um instalador. Em 
 
 ## O que está implementado
 
-- Menu no estilo do terminal da referência, com 18 opções e saída por 0.
+- Menu no estilo do terminal da referência, com 20 opções e saída por 0.
 - Limpeza real de arquivos diretamente na pasta temporária do usuário, com mais de sete dias, prévia e confirmação `LIMPAR`. Ignora links e não percorre subpastas; arquivos em uso podem falhar. A exclusão é permanente.
 - Consulta real de RAM disponível, processadores lógicos, tempo ligado e espaço em disco pelas APIs do sistema.
 - Quatro medições ICMP para um host informado, média e perda da amostra. ICMP bloqueado não comprova falha da conexão do jogo.
@@ -25,7 +25,7 @@ Abra `artifacts/win-x64/GameBoostPro.exe` no Windows. Não é um instalador. Em 
 
 Ainda não há WPF/MVVM, SQLite, perfis, monitoramento contínuo, gerenciador geral de processos, temperatura, uso de GPU ou medição de FPS. A restauração cobre somente o plano de energia alterado pelo Modo Jogo. O programa informa essas limitações; não apresenta métricas simuladas. Prefetch não é apagado. CPU, GPU, serviços, telemetria e registro não são alterados automaticamente. Relatórios de erro são encaminhados ao Painel de Controle para revisão manual. Cortana pode não existir nas versões atuais do Windows. Não há promessa de ganho de FPS ou ping.
 
-A limpeza e o Modo Jogo aplicam ações diretamente após confirmação; as demais configurações ficam a cargo do usuário nas ferramentas do Windows. Revise os efeitos antes de mudar recursos, aplicativos ou planos de energia. Antivírus, firewall, anticheats e drivers não são desativados pelo programa.
+As limpezas, a Lixeira e o Modo Jogo aplicam ações diretamente após confirmação; as demais configurações ficam a cargo do usuário nas ferramentas do Windows. Revise os efeitos antes de mudar recursos, aplicativos ou planos de energia. Antivírus, firewall, anticheats e drivers não são desativados pelo programa.
 
 A execução real das ferramentas e APIs precisa de validação em Windows 10/11; compilar em Linux não valida esse comportamento.
 
@@ -58,3 +58,23 @@ Antes de distribuir como validado em Windows 10/11, conferir em uma conta comum:
 - Jogo que abre por launcher; falha de abertura e diagnóstico com e sem eventos correspondentes.
 
 Nenhuma dessas verificações de Windows foi executada no ambiente Linux.
+
+## [19] ANALISAR E LIMPAR SSD / [20] ANALISAR E LIMPAR HD
+
+As duas entradas mantêm as opções anteriores e usam o mesmo fluxo de seleção de unidade. Não há servidor ou serviço novo para iniciar.
+
+- **Unidades:** letra, nome, capacidade, espaço usado/livre e tipo de conexão/unidade. SSD/HD usa o provedor Storage do Windows (`Get-Partition` → `Get-Disk`, associação por `UniqueId` com `Get-PhysicalDisk`). Sem associação única, privilégios ou suporte do dispositivo, aparece **Tipo desconhecido**, com confirmação para seleção manual. Volumes virtuais, RAID e alguns USB podem não ter classificação. C: e D: não implicam tipo de mídia. Mídias ausentes são indicadas; rede e CD não oferecem limpeza local.
+- **[1] Analisar espaço:** percorre somente a unidade escolhida, mostra até 20 maiores arquivos e 20 pastas, sem excluir nada. Q ou Ctrl+C cancela a análise; resultados cancelados são parciais. Links, junções/pontos de montagem internos, caminhos sem acesso e profundidade superior a 128 níveis são ignorados e contabilizados. Pastas aninhadas se sobrepõem; tamanhos são comprimentos lógicos, não uso físico exato (hardlinks, compressão e arquivos esparsos). Uma análise de disco inteiro pode demorar. Falhas de acesso são registradas no histórico local.
+- **[2] Temporários do usuário:** somente `.tmp` diretamente em `%LOCALAPPDATA%\Temp` com mais de sete dias, sem atributos de sistema/somente leitura e sem redirecionamento. Examina até 10001 entradas por execução e mostra os candidatos com caminho, tamanho e total estimado. Não usa uma variável TEMP arbitrária como autorização de exclusão. Se a pasta conhecida estiver em outra unidade, não é limpa nessa seleção. Subpastas, outros formatos, caches de jogos/shaders, Downloads, documentos e saves não são categorias de limpeza. A categoria começa desmarcada: digite `1` para selecionar e `LIMPAR` para confirmar. A exclusão é permanente. Antes de excluir, revalida caminho, idade, tamanho, data e ausência de links; abre com compartilhamento restrito e verifica o caminho final do handle. Usa `SetFileInformationByHandle` no arquivo aberto, sem exclusão recursiva. Arquivos alterados, em uso ou sem permissão são preservados. Esse critério é conservador e pode liberar pouco espaço; ele não declara inúteis arquivos arbitrários por idade/extensão.
+- **[3] Aplicativos:** lê as entradas Uninstall de HKCU/HKLM nas visões 32/64 bits, sem `Win32_Product` e sem executar strings de desinstalação do registro. Pesquisa por nome/editor e exibe nome, editor, versão, localização e estimativa do instalador ou tamanho desconhecido. Itens confirmados na unidade são identificados separadamente dos de localização desconhecida; os confirmados em outra unidade são omitidos. Apps MSIX/Store podem não aparecer. Por precaução, a revisão de remoção é oferecida somente para Chrome, Firefox, VLC, Spotify e OBS de editores reconhecidos, sem flags de sistema/atualização/remoção proibida; os demais ficam informativos e preservados. Selecione um por vez e digite `DESINSTALAR`: abre a ferramenta Aplicativos do Windows, onde você procura e confirma a remoção. Não apaga pastas e não afirma que o aplicativo foi removido. Dados e configurações podem ser perdidos pelo desinstalador.
+- **[4] Lixeira:** digite `ESVAZIAR`; o Windows apresenta também sua confirmação. `SHEmptyRecycleBin` recebe somente a raiz selecionada. Nunca apaga manualmente `$Recycle.Bin`. A exclusão é permanente e falhas/cancelamentos não são tratados como sucesso.
+- **[5] Limpeza oficial:** `ABRIR` inicia `cleanmgr.exe /d <unidade>`, sem opções automáticas. Temporários do Windows/componentes são tratados ali; nenhuma pasta protegida é apagada diretamente. Só o Windows solicita elevação ao escolher limpeza de sistema. Revise as categorias e não selecione arquivos pessoais. O otimizador não roda permanentemente como administrador.
+- **[6] Otimizar Unidades:** abre `dfrgui.exe` para revisão manual na ferramenta oficial. Não executa desfragmentação nem manutenção automática do SSD/HD.
+
+Após cada operação, mostra espaço livre antes e depois na mesma unidade. A diferença pode incluir atividade de outros processos, e não mede ganho de FPS. Ao abrir uma ferramenta externa de limpeza/desinstalação, conclua ou cancele nela e pressione Enter no otimizador para medir novamente; o otimizador não confirma o resultado dessa ferramenta.
+
+### Validação das opções 19/20
+
+No Linux: testes com arquivos reais isolados verificam análise, soma/ordenação, preservação de dados pessoais, cancelamento, fronteira da raiz e links simbólicos. O pipeline de exclusão usa um executor de teste para validar confirmação, revalidação e preservação, com erros de acesso/arquivo em uso **simulados**. Testa também política conservadora de aplicativos, localização desconhecida e cancelamento/falha ao abrir a ferramenta de desinstalação. Isso não valida bloqueios, permissões ACL nem exclusão por handle no Windows.
+
+**Pendentes em Windows 10/11:** classificação real de SSD/HD/USB/RAID; unidade desconectada; análise em NTFS com junções/mountpoints e diretórios sem acesso; cancelamento por Q/Ctrl+C; exclusão em pasta temporária com arquivo real em uso e sem permissão; confirmação independente da Lixeira de uma única unidade; leitura do registro, abertura de Aplicativos e cleanmgr; verificação de que só os candidatos aprovados são removidos e de que dados pessoais, outros volumes e shaders permanecem intactos. Nenhuma dessas operações Windows foi executada no ambiente Linux.
