@@ -32,6 +32,10 @@ static class StorageTests
         var personal = Create(Path.Combine(temp, "photo.jpg"));
         var sub = Directory.CreateDirectory(Path.Combine(temp, "sub"));
         var subFile = Create(Path.Combine(sub.FullName, "save.tmp"));
+        check(StorageSafety.Temporary(subFile, temp, DateTime.UtcNow.AddDays(-7), true), "subpastas Temp podem ser selecionadas explicitamente");
+        var shaders = Directory.CreateDirectory(Path.Combine(temp, "ShaderCache"));
+        var shader = Create(Path.Combine(shaders.FullName, "cache.tmp"));
+        check(!StorageSafety.Temporary(shader, temp, DateTime.UtcNow.AddDays(-7), true), "shader preservado mesmo com subpastas selecionadas");
         var external = Create(Path.Combine(outside.FullName, "outside.tmp"));
         var cutoff = DateTime.UtcNow.AddDays(-7);
         var planned = new[] { old, recent, personal, subFile, external };
@@ -61,9 +65,11 @@ static class StorageTests
         check(!InstalledApps.Optional("Google Chrome", "Google LLC", true, false, false) && !InstalledApps.Optional("Google Chrome", "Google LLC", false, true, false), "componentes e atualizações preservados mesmo com nome conhecido");
         var app = new InstalledApp("Google Chrome", "Google LLC", "1", root, null, true);
         check(InstalledApps.LocationGroup(app, root) == "Na unidade escolhida" && InstalledApps.LocationGroup(app with { Location = "" }, root) == "Localização desconhecida", "localização confirmada é separada de desconhecida");
+        int manual = 0;
+        check(InstalledApps.RequestRemoval(app with { Optional = false }, "DESINSTALAR", () => manual++) && manual == 1, "app fora da lista curta permite revisão manual no Windows");
         int opened = 0;
         check(!InstalledApps.RequestRemoval(app, "", () => opened++) && opened == 0, "cancelamento não abre desinstalação");
-        check(!InstalledApps.RequestRemoval(app with { Optional = false }, "DESINSTALAR", () => opened++) && opened == 0, "app protegido não permite solicitação");
+        check(!InstalledApps.RequestRemoval(app with { Protected = true }, "DESINSTALAR", () => opened++) && opened == 0, "app protegido não permite solicitação");
         bool failed = false; try { InstalledApps.RequestRemoval(app, "DESINSTALAR", () => throw new IOException("Windows indisponível")); } catch (IOException) { failed = true; }
         check(failed && opened == 0, "falha ao abrir desinstalação não é tratada como sucesso");
         check(InstalledApps.RequestRemoval(app, "DESINSTALAR", () => opened++) && opened == 1, "confirmação apenas abre ferramenta oficial uma vez");

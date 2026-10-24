@@ -31,9 +31,9 @@ public static class Program
         switch (n)
         {
             case 1: Open("optionalfeatures.exe"); break;
-            case 2: Open("ms-settings:appsfeatures"); break;
+            case 2: if (OperatingSystem.IsWindows()) StorageMenu.Apps(null); break;
             case 3: Console.WriteLine("Use Windows Update ou o fabricante. Nenhum driver será baixado por este aplicativo."); Open("ms-settings:windowsupdate"); break;
-            case 4: Clean(); break;
+            case 4: StorageMenu.Temporaries(Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))!); break;
             case 5: Console.WriteLine("Planos de desempenho podem aumentar consumo e temperatura."); Open("powercfg.cpl"); break;
             case 6: Open("SystemPropertiesPerformance.exe"); break;
             case 7: Console.WriteLine("Indisponível: excluir Prefetch indiscriminadamente pode piorar a inicialização. Use a limpeza de temporários."); break;
@@ -57,20 +57,6 @@ public static class Program
         var full = Path.GetFullPath(path); var basePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
         return full.StartsWith(basePath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
             && File.Exists(full) && (File.GetAttributes(full) & FileAttributes.ReparsePoint) == 0 && File.GetLastWriteTimeUtc(full) < cutoff;
-    }
-    static void Clean()
-    {
-        string root = Path.GetTempPath(); var cutoff = DateTime.UtcNow.AddDays(-7);
-        // Somente arquivos diretamente na pasta temporária; não seguir diretórios/junções.
-        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) throw new IOException("Pasta temporária redirecionada: limpeza recusada.");
-        var files = Directory.EnumerateFiles(root).Where(p => Eligible(p, root, cutoff)).ToArray();
-        long total = 0; foreach (var f in files) { try { total += new FileInfo(f).Length; Console.WriteLine(f); } catch (IOException) { } }
-        Console.WriteLine($"{files.Length} arquivos com mais de 7 dias; {total / 1048576.0:F2} MiB. Exclusão permanente; sem restauração.");
-        Console.Write("Digite LIMPAR para confirmar: "); if (Console.ReadLine() != "LIMPAR") return;
-        int deleted = 0, failed = 0;
-        foreach (var file in files) try { if (Eligible(file, root, cutoff)) { File.Delete(file); deleted++; } } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { failed++; }
-        var result = $"Excluídos: {deleted}; falhas/arquivos em uso: {failed}. Subpastas e temporários do sistema preservados.";
-        Console.WriteLine(result); Log(result);
     }
     static void PingHost()
     {

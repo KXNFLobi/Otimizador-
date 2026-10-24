@@ -2,7 +2,7 @@ using Microsoft.Win32;
 
 namespace GameBoostPro;
 
-public sealed record InstalledApp(string Name, string Publisher, string Version, string Location, long? SizeKiB, bool Optional);
+public sealed record InstalledApp(string Name, string Publisher, string Version, string Location, long? SizeKiB, bool Optional, bool Protected = false);
 
 public static class InstalledApps
 {
@@ -28,7 +28,7 @@ public static class InstalledApps
     }
     public static bool RequestRemoval(InstalledApp app, string? confirmation, Action openWindows)
     {
-        if (!app.Optional || confirmation != "DESINSTALAR") return false;
+        if (app.Protected || confirmation != "DESINSTALAR") return false;
         openWindows(); // Exceptions propagate; opening settings is never recorded as removal.
         return true;
     }
@@ -54,7 +54,9 @@ public static class InstalledApps
                         var publisher = Value("Publisher"); var size = Value("EstimatedSize");
                         result.Add(new(name, publisher, Value("DisplayVersion"), Value("InstallLocation"), long.TryParse(size, out var n) && n >= 0 ? n : null,
                             Optional(name, publisher, Value("SystemComponent") != "" && Value("SystemComponent") != "0",
-                                Value("ReleaseType") != "" || Value("ParentKeyName") != "", Value("NoRemove") != "" && Value("NoRemove") != "0")));
+                                Value("ReleaseType") != "" || Value("ParentKeyName") != "", Value("NoRemove") != "" && Value("NoRemove") != "0"),
+                            Value("SystemComponent") == "1" || Value("NoRemove") == "1" || Value("ReleaseType") != "" || Value("ParentKeyName") != "" ||
+                            new[] { "driver", "anticheat", "anti-cheat", "defender", "antivirus", "anti-virus", "firewall", "visual c++", ".net", "runtime", "windows update" }.Any(term => name.Contains(term, StringComparison.OrdinalIgnoreCase))));
                     }
                     catch (Exception ex) when (StorageSafety.AccessError(ex)) { Program.Log("Aplicativo inacessível no registro: " + ex.Message); }
                 }

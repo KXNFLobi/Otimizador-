@@ -89,45 +89,61 @@ public static class StorageMenu
         }
         finally { Console.CancelKeyPress -= handler; }
     }
-    static void Temporaries(string volume)
+    internal static void Temporaries(string volume)
     {
         var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp");
-        Console.WriteLine("Categorias inicialmente desmarcadas. Temporários do Windows/componentes: use [5], limpeza oficial; não serão apagados diretamente.");
+        Console.WriteLine("Categorias inicialmente desmarcadas. Temporários do Windows/componentes: nas opções 19/20 use [5], limpeza oficial; não serão apagados diretamente.");
         if (!StorageSafety.Within(root, volume)) { Console.WriteLine("A pasta temporária conhecida do usuário está em outra unidade. Nenhum arquivo candidato nesta categoria."); return; }
         if (!Directory.Exists(root) || !StorageSafety.NoLinks(root)) { Console.WriteLine("Pasta temporária indisponível ou redirecionada; preservada."); return; }
-        var cutoff = DateTime.UtcNow.AddDays(-7); var files = new List<DiskFile>(); int errors = 0;
-        foreach (var path in Directory.EnumerateFiles(root).Take(10001))
+        Console.Write("Incluir subpastas de Temp? Somente arquivos .tmp, sem links. Digite SIM ou Enter para não: ");
+        bool recursive = Console.ReadLine() == "SIM";
+        Console.Write("Idade mínima: [1] 7 dias (padrão) [2] 24 horas. Escolha: ");
+        var cutoff = DateTime.UtcNow.AddDays(Console.ReadLine() == "2" ? -1 : -7); var files = new List<DiskFile>(); int errors = 0;
+        var pending = new Stack<string>(); pending.Push(root); int examined = 0;
+        while (pending.Count > 0 && examined < 10000)
         {
+            var directory = pending.Pop();
             try
             {
-                var info = new FileInfo(path); var snapshot = new DiskFile(path, info.Length, info.LastWriteTimeUtc);
-                if (StorageSafety.Temporary(snapshot, root, cutoff)) files.Add(snapshot);
+                if (!StorageSafety.NoLinks(directory)) continue;
+                foreach (var child in Directory.EnumerateFileSystemEntries(directory))
+                {
+                    if (++examined > 10000) break;
+                    try
+                    {
+                        if (!StorageSafety.NoLinks(child)) continue;
+                        if (Directory.Exists(child)) { if (recursive && pending.Count < 10000) pending.Push(child); continue; }
+                        var info = new FileInfo(child); var snapshot = new DiskFile(child, info.Length, info.LastWriteTimeUtc);
+                        if (StorageSafety.Temporary(snapshot, root, cutoff, recursive)) files.Add(snapshot);
+                    }
+                    catch (Exception ex) when (StorageSafety.AccessError(ex)) { errors++; }
+                }
             }
             catch (Exception ex) when (StorageSafety.AccessError(ex)) { errors++; }
         }
-        Console.WriteLine($"[1] Temporários do usuário: .tmp diretamente em {root}, com mais de sete dias. Subpastas e outros formatos preservados. Até 10001 entradas examinadas por execução; erros: {errors}.");
+        Console.WriteLine($"[1] Temporários do usuário: .tmp em {root}, anteriores a {cutoff.ToLocalTime():g}. Incluir subpastas: {recursive}. Outros formatos preservados. Até 10000 entradas examinadas por execução; erros: {errors}.");
         foreach (var f in files) Console.WriteLine($"{f.Size} bytes — {Safe(f.Path)}");
         Console.WriteLine($"{files.Count} candidatos; tamanho estimado {GiB(files.Sum(f => f.Size))}. Ser antigo/.tmp só autoriza candidatura neste local conhecido, não indica que qualquer arquivo seja inútil.");
-        if (files.Count == 0) return;
+        if (files.Count == 0) { Console.WriteLine("Sem .tmp elegíveis nesta categoria. Para outros temporários, entre na opção 19 ou 20 e escolha [5] Limpeza oficial do Windows."); return; }
         Console.Write("Digite 1 para selecionar esta categoria; Enter preserva tudo: "); if (Console.ReadLine() != "1") return;
         Console.Write("Exclusão permanente, sem restauração. Arquivos em uso serão preservados. Digite LIMPAR para confirmar: ");
-        var result = StorageSafety.Clean(files, root, volume, cutoff, Console.ReadLine());
+        var result = StorageSafety.Clean(files, root, volume, cutoff, Console.ReadLine(), includeSubfolders: recursive);
         Report($"Temporários: excluídos {result.Deleted}; ignorados {result.Skipped}; falhas/arquivos em uso {result.Failed}.");
     }
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    static void Apps(string volume)
+    internal static void Apps(string? volume)
     {
         var apps = InstalledApps.Read();
-        Console.WriteLine("Aplicativos tradicionais do registro (MSIX/Store podem não aparecer). Tamanho é informado pelo instalador, não medido. Itens desconhecidos/protegidos são apenas informativos.");
+        Console.WriteLine("Aplicativos tradicionais do registro (MSIX/Store podem não aparecer). Tamanho é informado pelo instalador, não medido. A remoção é confirmada manualmente no Windows; componentes protegidos ficam informativos.");
         Console.Write("Pesquisar nome/editor, ou Enter para listar: "); var query = Console.ReadLine() ?? "";
         var visible = apps.Where(a => a.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || a.Publisher.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Where(a => InstalledApps.LocationGroup(a, volume) != "Outra unidade").ToList();
+            .ToList();
         for (int i = 0; i < visible.Count; i++)
         {
-            var a = visible[i]; Console.WriteLine($"[{i + 1}] {Safe(a.Name)} | {Safe(a.Publisher)} | {Safe(a.Version)} | {Safe(a.Location)} | {(a.SizeKiB.HasValue ? (a.SizeKiB.Value / 1024.0).ToString("F1") + " MiB (estimativa)" : "Tamanho desconhecido")} | {InstalledApps.LocationGroup(a, volume)} | {(a.Optional ? "Revisão de desinstalação permitida" : "Preservado; identidade/tipo não confirmados")}");
+            var a = visible[i]; Console.WriteLine($"[{i + 1}] {Safe(a.Name)} | {Safe(a.Publisher)} | {Safe(a.Version)} | {Safe(a.Location)} | {(a.SizeKiB.HasValue ? (a.SizeKiB.Value / 1024.0).ToString("F1") + " MiB (estimativa)" : "Tamanho desconhecido")} | {(volume is null ? "Todas as unidades" : InstalledApps.LocationGroup(a, volume))} | {(!a.Protected ? "Selecionar para desinstalar no Windows" : "Componente protegido")}");
         }
         Console.Write("Escolha um aplicativo por vez (Enter volta): "); int selected = SelectIndex(Console.ReadLine(), visible.Count); if (selected < 0) return;
-        var app = visible[selected]; if (!app.Optional) { Console.WriteLine("Preservado: não oferecido para desinstalação por este programa."); return; }
+        var app = visible[selected]; if (app.Protected) { Console.WriteLine("Preservado: não oferecido para desinstalação por este programa."); return; }
         Console.WriteLine($"Selecionado: {Safe(app.Name)}. Desinstalar pode remover dados/configurações. A localização informada não garante onde todos os dados estão.");
         Console.Write("Digite DESINSTALAR para abrir Aplicativos do Windows; procure o nome selecionado e confirme lá: ");
         if (InstalledApps.RequestRemoval(app, Console.ReadLine(), () => Open("ms-settings:appsfeatures")))

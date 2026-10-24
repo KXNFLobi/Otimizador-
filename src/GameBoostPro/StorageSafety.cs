@@ -83,17 +83,20 @@ public static class StorageSafety
         return new(files, folders, bytes, count, errors, cancelled);
     }
     public static bool AccessError(Exception ex) => ex is IOException or UnauthorizedAccessException or System.Security.SecurityException;
-    public static bool Temporary(DiskFile file, string root, DateTime cutoff)
+    public static bool Temporary(DiskFile file, string root, DateTime cutoff, bool includeSubfolders = false)
     {
-        // Deliberately only direct .tmp files: no game caches, logs or subdirectories.
-        if (!Within(file.Path, root) || !string.Equals(Path.GetDirectoryName(Path.GetFullPath(file.Path)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)), Comparison)) return false;
+        // Only .tmp in the known temporary root; recursive traversal requires explicit opt-in.
+        if (!Within(file.Path, root) || (!includeSubfolders && !string.Equals(Path.GetDirectoryName(Path.GetFullPath(file.Path)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)), Comparison))) return false;
         if (!Path.GetExtension(file.Path).Equals(".tmp", StringComparison.OrdinalIgnoreCase) || !NoLinks(file.Path)) return false;
+        var relative = Path.GetRelativePath(root, file.Path);
+        if (relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1).Any(segment =>
+            new[] { "shader", "d3d", "dxcache", "glcache", "save", "mods", "anticheat", "anti-cheat", "logs", "config" }.Any(term => segment.Contains(term, StringComparison.OrdinalIgnoreCase)))) return false;
         var info = new FileInfo(file.Path);
         return info.Exists && info.Length == file.Size && info.LastWriteTimeUtc == file.Modified && info.LastWriteTimeUtc < cutoff &&
             (info.Attributes & (FileAttributes.Directory | FileAttributes.ReadOnly | FileAttributes.System)) == 0;
     }
     public static CleanupResult Clean(IEnumerable<DiskFile> files, string root, string volume, DateTime cutoff, string? confirmation,
-        Action<DiskFile>? remove = null)
+        Action<DiskFile>? remove = null, bool includeSubfolders = false)
     {
         int deleted = 0, skipped = 0, failed = 0;
         var list = files.DistinctBy(f => f.Path).ToArray();
@@ -102,7 +105,7 @@ public static class StorageSafety
         {
             try
             {
-                if (!Within(root, volume) || !Temporary(file, root, cutoff)) { skipped++; continue; }
+                if (!Within(root, volume) || !Temporary(file, root, cutoff, includeSubfolders)) { skipped++; continue; }
                 (remove ?? DeleteLocked)(file);
                 deleted++; Program.Log("Temporário excluído: " + file.Path);
             }
@@ -113,10 +116,12 @@ public static class StorageSafety
     }
     static void DeleteLocked(DiskFile snapshot)
     {
-        // Never retry with broader sharing: files in use remain untouched.
-        using var file = new FileStream(snapshot.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.Delete);
-        if (file.Length != snapshot.Size || File.GetLastWriteTimeUtc(snapshot.Path) != snapshot.Modified || !NoLinks(snapshot.Path)) throw new IOException("Arquivo alterado após a prévia.");
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Exclusão por handle exige Windows.");
+        // DELETE access is required for FileDispositionInfo. Do not broaden sharing on failure.
+        using var handle = CreateFile(snapshot.Path, 0x80010000, 4, IntPtr.Zero, 3, 0x00200000, IntPtr.Zero);
+        if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+        using var file = new FileStream(handle, FileAccess.Read);
+        if (file.Length != snapshot.Size || File.GetLastWriteTimeUtc(snapshot.Path) != snapshot.Modified || !NoLinks(snapshot.Path)) throw new IOException("Arquivo alterado após a prévia.");
         var final = new System.Text.StringBuilder(32768);
         var length = GetFinalPathNameByHandle(file.SafeFileHandle, final, (uint)final.Capacity, 0);
         var expected = Path.GetFullPath(snapshot.Path);
@@ -125,6 +130,8 @@ public static class StorageSafety
         var disposition = new Disposition { Delete = true };
         if (!SetFileInformationByHandle(file.SafeFileHandle, 4, ref disposition, (uint)Marshal.SizeOf<Disposition>())) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateFileW")]
+    static extern SafeFileHandle CreateFile(string path, uint access, uint sharing, IntPtr security, uint creation, uint flags, IntPtr template);
     [StructLayout(LayoutKind.Sequential)] struct Disposition { [MarshalAs(UnmanagedType.U1)] public bool Delete; }
     [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetFileInformationByHandle(SafeFileHandle handle, int infoClass, ref Disposition info, uint size);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern uint GetFinalPathNameByHandle(SafeFileHandle handle, System.Text.StringBuilder name, uint size, uint flags);
