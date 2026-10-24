@@ -59,6 +59,12 @@ try
     failed = false; try { recovered.Restore(); } catch (System.Text.Json.JsonException) { failed = true; }
     Check(failed && recovered.Pending && active == original, "registro inválido não aplica plano e é preservado");
     StorageTests.Run(root, Check);
+    Check(HardwareMonitor.CpuPercent(new(100, 200, 100), new(120, 260, 120)) == 75, "CPU desconta idle incluído no contador kernel");
+    Check(HardwareMonitor.CpuPercent(new(100, 200, 100), new(100, 200, 100)) is null, "CPU sem intervalo não inventa percentual");
+    Check(HardwareMonitor.CpuPercent(new(100, 200, 100), new(90, 260, 120)) is null, "contador regressivo é indisponível");
+    Check(HardwareMonitor.CpuPercent(new(0, 0, 0), new(100, 20, 10)) is null, "amostra inconsistente não produz CPU negativa");
+    Check(HardwareMonitor.Temperature("CPU", null).Contains("indisponível") && HardwareMonitor.Temperature("GPU", double.NaN).Contains("indisponível"), "temperatura ausente não é simulada");
+    Check(HardwareMonitor.Temperature("CPU", 55).Contains("55") && HardwareMonitor.Temperature("CPU", 55).Contains("°C"), "temperatura informada é exibida em Celsius");
     Console.WriteLine($"{passed} testes aprovados.");
 }
 finally { Directory.Delete(root, true); }

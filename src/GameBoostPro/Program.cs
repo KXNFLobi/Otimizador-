@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net.NetworkInformation;
-using System.Runtime.InteropServices;
 
 namespace GameBoostPro;
 
@@ -38,7 +37,7 @@ public static class Program
             case 6: Open("SystemPropertiesPerformance.exe"); break;
             case 7: Console.WriteLine("Indisponível: excluir Prefetch indiscriminadamente pode piorar a inicialização. Use a limpeza de temporários."); break;
             case 8: Open("ms-settings:startupapps"); break;
-            case 9: Monitor(); break;
+            case 9: HardwareMonitor.Run(); break;
             case 10: Open("ms-settings:privacy-backgroundapps"); break;
             case 11: Open("ms-settings:gaming-gamebar"); break;
             case 12: Console.WriteLine("Revise relatórios em Segurança e Manutenção. Não desativamos serviços automaticamente."); Open("control.exe"); break;
@@ -66,18 +65,6 @@ public static class Program
         for (int i = 0; i < 4; i++) { var reply = ping.Send(host, 1500); Console.WriteLine(reply.Status == IPStatus.Success ? $"{reply.RoundtripTime} ms" : reply.Status.ToString()); if (reply.Status == IPStatus.Success) times.Add(reply.RoundtripTime); }
         Console.WriteLine($"Perda nesta amostra: {(4 - times.Count) * 25}%." + (times.Count > 0 ? $" Média: {times.Average():F1} ms." : " ICMP pode estar bloqueado."));
         Console.WriteLine("Prefira cabo e pause downloads. Este diagnóstico não altera DNS nem promete reduzir ping.");
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    struct Memory { public uint Length, Load; public ulong Total, Available, PageTotal, PageAvailable, VirtualTotal, VirtualAvailable, Extended; }
-    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GlobalMemoryStatusEx(ref Memory memory);
-    static void Monitor()
-    {
-        var memory = new Memory { Length = (uint)Marshal.SizeOf<Memory>() };
-        if (GlobalMemoryStatusEx(ref memory)) Console.WriteLine($"RAM: {memory.Load}% em uso; disponível {memory.Available / 1073741824.0:F2} / {memory.Total / 1073741824.0:F2} GiB");
-        else Console.WriteLine("RAM indisponível.");
-        Console.WriteLine($"Processadores lógicos: {Environment.ProcessorCount}; tempo ligado: {TimeSpan.FromMilliseconds(Environment.TickCount64):g}");
-        foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady)) Console.WriteLine($"{drive.Name}: {drive.AvailableFreeSpace / 1073741824.0:F1} GiB livres");
-        Console.WriteLine("Temperatura, uso de GPU e FPS indisponíveis nesta versão: exigem sensores/provedores compatíveis.");
     }
     internal static void Log(string message)
     {
