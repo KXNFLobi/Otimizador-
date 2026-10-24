@@ -6,18 +6,21 @@ namespace GameBoostPro;
 
 public static class Program
 {
-    public static readonly string[] Options = ["Desativar recursos", "Desinstalar apps", "Atualizar drivers", "Limpar temporários", "Recursos de energia", "Configurações visuais", "Limpar Prefetch", "Apps de inicialização", "Monitorar hardware e temperatura", "Apps de segundo plano", "Configurar Game Bar", "Relatórios de erro", "Configurar Cortana", "Prioridade da CPU / GPU", "Configurar telemetria", "Prioridade foreground", "Diagnosticar conexão e ping"];
+    public static readonly string[] Options = ["Desativar recursos", "Desinstalar apps", "Atualizar drivers", "Limpar temporários", "Recursos de energia", "Configurações visuais", "Limpar Prefetch", "Apps de inicialização", "Monitorar hardware e temperatura", "Apps de segundo plano", "Configurar Game Bar", "Relatórios de erro", "Configurar Cortana", "Prioridade da CPU / GPU", "Configurar telemetria", "Prioridade foreground", "Diagnosticar conexão e ping", "MODO JOGO — FPS E ESTABILIDADE"];
     public static int Main(string[] args)
     {
         if (args.Contains("--help")) { Console.WriteLine("GAME BOOST PRO — menu Windows 10/11. Execute sem argumentos no Windows."); return 0; }
         if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("As operações exigem Windows 10/11. Nenhum ajuste foi aplicado."); return 1; }
+        using var instance = GameMode.AcquireLock();
+        if (instance is null) return 1;
+        try { GameMode.Recover(); } catch (Exception ex) { Console.WriteLine($"Restauração pendente: {ex.Message}"); }
         while (true)
         {
             Console.WriteLine("\n==================================================\n                 GAME BOOST PRO\n==================================================");
             for (int i = 0; i < Options.Length; i++) Console.WriteLine($"[{i + 1,2}] > {Options[i]}");
             Console.WriteLine("[ 0] > SAIR"); Console.Write("\nEscolha uma opção: ");
             var input = Console.ReadLine(); if (input is null || input == "0") return 0;
-            if (!int.TryParse(input, out int n) || n < 1 || n > 17) { Console.WriteLine("Opção inválida."); continue; }
+            if (!int.TryParse(input, out int n) || n < 1 || n > Options.Length) { Console.WriteLine("Opção inválida."); continue; }
             try { Execute(n); }
             catch (Exception ex) { Console.WriteLine($"Falha: {ex.Message}"); Log($"Falha na opção {n}: {ex.Message}"); }
         }
@@ -44,6 +47,7 @@ public static class Program
             case 15: Open("ms-settings:privacy-feedback"); break;
             case 16: Console.WriteLine("Em Avançado > Agendamento do processador, revise a preferência por Programas. Sem ajustes automáticos no registro."); Open("SystemPropertiesPerformance.exe"); break;
             case 17: PingHost(); break;
+            case 18: GameMode.Run(); break;
         }
     }
     public static bool Eligible(string path, string root, DateTime cutoff)
@@ -87,7 +91,7 @@ public static class Program
         foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady)) Console.WriteLine($"{drive.Name}: {drive.AvailableFreeSpace / 1073741824.0:F1} GiB livres");
         Console.WriteLine("Temperatura, uso de GPU e FPS indisponíveis nesta versão: exigem sensores/provedores compatíveis.");
     }
-    static void Log(string message)
+    internal static void Log(string message)
     {
         try { string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GameBoostPro"); Directory.CreateDirectory(dir); File.AppendAllText(Path.Combine(dir, "history.log"), $"{DateTimeOffset.Now:O} {message}{Environment.NewLine}"); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.Error.WriteLine("Não foi possível gravar o histórico local."); }
